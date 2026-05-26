@@ -1,0 +1,24 @@
+{
+  "id": "keyhover",
+  "title": "KeyHover",
+  "description": "Lightweight toggle for inline key display on actor sheets.",
+  "version": "1.0.0",
+  "authors": [
+    {
+      "name": "Ketsushin"
+    }
+  ],
+  "compatibility": {
+    "minimum": "11",
+    "verified": "12"
+  },
+  "esmodules": [
+    "keyhover.js"
+  ],
+  "styles": [
+    "keyhover.css"
+  ],
+  "url": "https://github.com/Ketsushin/KeyVision",
+  "manifest": "https://raw.githubusercontent.com/Ketsushin/KeyVision/main/module.json",
+  "download": "https://github.com/Ketsushin/KeyVision/releases/latest/download/module.zip"
+}
