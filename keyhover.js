@@ -1,9 +1,26 @@
+/**
+ * KeyHover — Foundry VTT Module
+ * Adds a per-sheet toggle that reveals the underlying data path of any
+ * named field or data-property element on actor sheets.
+ *
+ * Hover               → tooltip shows the raw data path
+ * Alt + Hover         → tooltip shows inline roll syntax  (@abilities.dex.mod)
+ * Middle / Ctrl+Click → copies the path to the clipboard
+ * Alt + Middle/Ctrl   → copies the inline roll syntax
+ *
+ * Compatible with Foundry VTT V11+ (ApplicationV1 actor sheets).
+ * System-agnostic — relies solely on standard `name` and `data-property` attributes.
+ */
+
 // Formats a raw data path for display or copy.
-// Alt-mode strips the "system." prefix and prepends "@" for inline roll syntax.
+// When useInlineFormat is true, strips the leading "system." prefix and prepends "@"
+// to produce a valid Foundry inline roll reference (e.g. @abilities.dex.mod).
 function _formatPath(path, useInlineFormat) {
   return useInlineFormat ? "@" + path.replace(/^system\./, "") : path;
 }
 
+// Create the shared floating tooltip once when the world is ready.
+// The guard prevents duplicate elements if the module is reloaded during development.
 Hooks.once("ready", () => {
   if (document.getElementById("keyhover-tooltip")) return;
   const tip = document.createElement("div");
@@ -41,16 +58,12 @@ Hooks.on("renderActorSheet", (app, html) => {
     html.find(".keyhover-toggle").addClass("active");
   }
 
-  // Clean up listeners from the previous render to prevent stacking.
-  if (app._keyHoverMoveHandler) {
-    html[0].removeEventListener("mousemove", app._keyHoverMoveHandler);
-  }
-  if (app._keyHoverLeaveHandler) {
-    html[0].removeEventListener("mouseleave", app._keyHoverLeaveHandler);
-  }
-  if (app._keyHoverDownHandler) {
-    html[0].removeEventListener("mousedown", app._keyHoverDownHandler);
-  }
+  // Remove stale listeners before attaching fresh ones.
+  // Foundry V11/V12 may reuse the same root element across soft re-renders,
+  // so we cannot rely on the element being replaced to clear old handlers.
+  if (app._keyHoverMoveHandler)  html[0].removeEventListener("mousemove",  app._keyHoverMoveHandler);
+  if (app._keyHoverLeaveHandler) html[0].removeEventListener("mouseleave", app._keyHoverLeaveHandler);
+  if (app._keyHoverDownHandler)  html[0].removeEventListener("mousedown",  app._keyHoverDownHandler);
 
   const tip = document.getElementById("keyhover-tooltip");
 
@@ -79,8 +92,9 @@ Hooks.on("renderActorSheet", (app, html) => {
 
     tip.textContent = _formatPath(path, event.altKey);
     tip.hidden = false;
+    // Offset from the cursor so the tooltip does not obscure the element being inspected.
     tip.style.left = `${event.clientX + 14}px`;
-    tip.style.top = `${event.clientY + 14}px`;
+    tip.style.top  = `${event.clientY + 14}px`;
     app._keyHoverLastPath = path;
   };
 
@@ -100,12 +114,21 @@ Hooks.on("renderActorSheet", (app, html) => {
     const path = el.getAttribute("name") || el.getAttribute("data-property");
     const text = _formatPath(path, event.altKey);
 
+    // navigator.clipboard requires a secure context (HTTPS or localhost).
+    // Foundry VTT satisfies this in all normal deployments, but we guard defensively.
+    if (!navigator.clipboard) {
+      ui.notifications.warn("KeyHover: Clipboard API unavailable in this context.");
+      return;
+    }
+
     navigator.clipboard.writeText(text).then(() => {
       ui.notifications.info(`Copied: ${text}`);
+    }).catch(() => {
+      ui.notifications.warn("KeyHover: Could not write to clipboard.");
     });
   };
 
-  html[0].addEventListener("mousemove", app._keyHoverMoveHandler);
+  html[0].addEventListener("mousemove",  app._keyHoverMoveHandler);
   html[0].addEventListener("mouseleave", app._keyHoverLeaveHandler);
-  html[0].addEventListener("mousedown", app._keyHoverDownHandler);
+  html[0].addEventListener("mousedown",  app._keyHoverDownHandler);
 });
